@@ -1,0 +1,25 @@
+{
+  "name": "virtual-piano",
+  "productName": "Virtual Piano",
+  "version": "1.0.0",
+  "description": "Virtual Piano — Frappe Magique, Auto-Play, Piano Réaliste & Micro Virtuel",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "piano",
+    "midi",
+    "virtual-mic",
+    "autoplay"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.9.0"
+  },
+  "dependencies": {
+    "@tonejs/midi": "^2.0.28"
+  }
+}

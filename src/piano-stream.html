@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtual Piano</title>
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.stream-body {
+      background: #0d0d0f;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+    }
+
+    .stream-stage {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+
+    #stream-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stream-piano-dock {
+      height: 215px;
+      background: #0a0a0c;
+      border-top: 1px solid #27272c;
+      padding: 0 10px 10px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 10;
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.75);
+    }
+
+    /* Hide keyboard shortcut characters in stream view so it looks like a pure acoustic grand piano */
+    .stream-piano-dock .key-char-label {
+      display: none;
+    }
+  </style>
+</head>
+<body class="stream-body">
+  <div class="stream-stage">
+    <canvas id="stream-canvas"></canvas>
+  </div>
+
+  <footer class="stream-piano-dock">
+    <div class="piano-fallboard"></div>
+    <div id="stream-piano-keyboard" class="piano-keyboard"></div>
+  </footer>
+
+  <script src="songs.js"></script>
+  <script>
+    (function () {
+      const { PIANO_KEYS } = window.KeyFlowSongs;
+      const keyboardEl = document.getElementById('stream-piano-keyboard');
+      const canvas = document.getElementById('stream-canvas');
+      const ctx = canvas.getContext('2d');
+
+      const keyEls = new Map();
+      const keyRects = new Map();
+      const activeNotes = new Set();
+      const risingBars = []; // Visual Synthesia-style rising bars from active keys
+
+      function renderKeyboard() {
+        keyboardEl.innerHTML = '';
+        const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
+        const totalWhites = whiteKeys.length;
+        let whiteIndex = 0;
+
+        PIANO_KEYS.forEach((keyObj) => {
+          const keyEl = document.createElement('div');
+          keyEl.className = `piano-key ${keyObj.isBlack ? 'black' : 'white'}`;
+          keyEl.dataset.note = keyObj.note;
+
+          keyEl.innerHTML = `<span class="key-note-label">${keyObj.note}</span>`;
+
+          if (keyObj.isBlack) {
+            const leftPercent = ((whiteIndex / totalWhites) * 100) - 0.95;
+            keyEl.style.left = `${leftPercent}%`;
+          } else {
+            whiteIndex++;
+          }
+
+          keyEl.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (window.electronAPI) {
+              window.electronAPI.sendStreamInput({ type: 'mousedown', note: keyObj.note });
+            }
+          });
+          const stopMouse = () => {
+            if (window.electronAPI) {
+              window.electronAPI.sendStreamInput({ type: 'mouseup', note: keyObj.note });
+            }
+          };
+          keyEl.addEventListener('mouseup', stopMouse);
+          keyEl.addEventListener('mouseleave', stopMouse);
+
+          keyboardEl.appendChild(keyEl);
+          keyEls.set(keyObj.note, keyEl);
+        });
+      }
+
+      function updateCanvasSize() {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        const stageRect = canvas.getBoundingClientRect();
+        keyEls.forEach((el, note) => {
+          const r = el.getBoundingClientRect();
+          keyRects.set(note, {
+            x: r.left - stageRect.left,
+            width: r.width,
+            isBlack: el.classList.contains('black')
+          });
+        });
+      }
+
+      window.addEventListener('resize', updateCanvasSize);
+
+      // Forward keyboard typing on the Stream Window directly to the Control Window!
+      window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        e.preventDefault();
+        if (window.electronAPI) {
+          window.electronAPI.sendStreamInput({
+            type: 'keydown',
+            key: e.key,
+            code: e.code,
+            repeat: e.repeat
+          });
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (window.electronAPI) {
+          window.electronAPI.sendStreamInput({
+            type: 'keyup',
+            key: e.key,
+            code: e.code
+          });
+        }
+      });
+
+      window.addEventListener('blur', () => {
+        if (window.electronAPI) {
+          window.electronAPI.sendStreamInput({ type: 'blur' });
+        }
+      });
+
+      // Receive active notes from main control window
+      if (window.electronAPI && window.electronAPI.onStreamActiveNotes) {
+        window.electronAPI.onStreamActiveNotes((notesArray) => {
+          const nextSet = new Set(notesArray || []);
+
+          // Start new rising neon bars for newly pressed notes
+          nextSet.forEach((n) => {
+            if (!activeNotes.has(n)) {
+              const info = keyRects.get(n);
+              if (info) {
+                risingBars.push({
+                  note: n,
+                  x: info.x + 2,
+                  width: Math.max(6, info.width - 4),
+                  y: canvas.height,
+                  height: 6,
+                  held: true,
+                  color: info.isBlack ? '#d97706' : '#e5a93c'
+                });
+              }
+            }
+          });
+
+          // Mark bars as released if note is no longer active
+          risingBars.forEach((bar) => {
+            if (bar.held && !nextSet.has(bar.note)) {
+              bar.held = false;
+            }
+          });
+
+          activeNotes.clear();
+          nextSet.forEach((n) => activeNotes.add(n));
+
+          keyEls.forEach((el, note) => {
+            el.classList.toggle('active', activeNotes.has(note));
+          });
+        });
+      }
+
+      function animateVisualizer() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const speed = 3.6;
+        for (let i = risingBars.length - 1; i >= 0; i--) {
+          const b = risingBars[i];
+          if (b.held) {
+            b.y -= speed;
+            b.height += speed;
+          } else {
+            b.y -= speed;
+          }
+
+          ctx.save();
+          ctx.fillStyle = b.color;
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.roundRect(b.x, b.y, b.width, b.height, 5);
+          ctx.fill();
+          ctx.restore();
+
+          if (b.y + b.height < -20) {
+            risingBars.splice(i, 1);
+          }
+        }
+
+        requestAnimationFrame(animateVisualizer);
+      }
+
+      renderKeyboard();
+      setTimeout(updateCanvasSize, 80);
+      requestAnimationFrame(animateVisualizer);
+    })();
+  </script>
+</body>
+</html>

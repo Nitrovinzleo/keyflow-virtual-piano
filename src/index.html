@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtual Piano</title>
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Drag and Drop Overlay -->
+  <div id="drop-overlay" class="drop-overlay hidden">
+    <div class="drop-box">
+      <h2>Importer un fichier MIDI (.mid) ou Partition (.txt)</h2>
+      <p>Relâchez le fichier pour le charger</p>
+    </div>
+  </div>
+
+  <!-- Top Header Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="icon.png" alt="Virtual Piano" class="brand-logo-img" />
+      </div>
+      <div class="brand-titles">
+        <h1>Virtual Piano</h1>
+      </div>
+    </div>
+
+    <!-- Main 3 Play Modes Switcher -->
+    <div class="mode-switcher" role="tablist">
+      <button class="mode-btn active" data-mode="mash" id="mode-mash-btn">
+        Mode Assisté
+      </button>
+      <button class="mode-btn" data-mode="autoplay" id="mode-autoplay-btn">
+        Lecture Auto
+      </button>
+      <button class="mode-btn" data-mode="free" id="mode-free-btn">
+        Clavier Libre
+      </button>
+    </div>
+
+    <!-- Global Shortcuts & Window Pin Controls -->
+    <div class="top-actions">
+      <button id="btn-global-capture" class="pill-btn" title="Capturer le clavier en arrière-plan (F8)">
+        <span class="status-dot" id="capture-dot"></span>
+        <span>Arrière-plan (F8)</span>
+      </button>
+      <button id="btn-pin-window" class="pill-btn" title="Toujours au premier plan">
+        Épingler
+      </button>
+      <button id="btn-help-mic" class="pill-btn" title="Configuration du routage audio vers Discord">
+        Configuration Audio
+      </button>
+      <!-- Bouton Rouge Caché : Divise le Menu et le Piano en 2 fenêtres pour Streamer uniquement le Piano -->
+      <button id="btn-secret-split" class="secret-red-btn" title="Ouvrir le clavier dans une fenêtre séparée"></button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Grid -->
+  <main class="workspace" id="main-workspace">
+    <!-- Left Sidebar: Song Library & Dedicated Queue Compartment -->
+    <aside class="panel sidebar-left" id="panel-left">
+      <div class="panel-header">
+        <h2>Répertoire MIDI Complet</h2>
+        <div class="import-actions">
+          <button id="btn-import-file" class="btn primary">
+            Importer .mid / .txt
+          </button>
+          <button id="btn-open-midi-folder" class="btn secondary" title="Ouvrir le dossier midi/ sur Windows">
+            Dossier MIDI
+          </button>
+          <button id="btn-open-sheet-modal" class="btn secondary" title="Coller une partition texte">
+            Partition
+          </button>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <input type="text" id="song-search" placeholder="Rechercher un titre..." />
+        <button type="button" id="btn-clear-search" class="search-clear-btn hidden" title="Effacer la recherche" aria-label="Effacer la recherche">&#10005;</button>
+      </div>
+
+      <div class="library-filter-bar">
+        <button id="filter-all-btn" class="filter-tab active" data-filter="all">Tous</button>
+        <button id="filter-fav-btn" class="filter-tab" data-filter="fav">Favoris <span id="fav-count-badge" class="fav-count">0</span></button>
+        <button id="filter-queue-btn" class="filter-tab" data-filter="queue">File <span id="queue-count-badge" class="fav-count">0</span></button>
+        <button id="btn-restore-deleted" class="filter-restore hidden" title="Restaurer les morceaux supprimés du répertoire">Restaurer</button>
+      </div>
+
+      <div id="song-list" class="song-list">
+        <!-- Populated dynamically from BUILTIN_SONGS + imported songs -->
+      </div>
+
+      <!-- Horizontal Resizer between Repertoire and File d'attente -->
+      <div class="resizer-h" id="resizer-queue" title="Glisser pour agrandir/réduire la File d'attente (Double-clic : réinitialiser)"></div>
+
+      <!-- Dedicated Always-Visible Song Queue Compartment -->
+      <div class="queue-compartment" id="queue-compartment">
+        <div class="queue-compartment-header">
+          <span class="queue-compartment-title">FILE D'ATTENTE (<strong id="queue-box-count">0</strong>)</span>
+          <div class="queue-compartment-actions">
+            <button id="btn-queue-next" class="queue-clear-btn" title="Passer au morceau suivant (4s)">Suivant (4s)</button>
+            <button id="btn-clear-queue" class="queue-clear-btn" title="Vider la file d'attente">Vider</button>
+          </div>
+        </div>
+        <div id="queue-box-list" class="queue-box-list">
+          <!-- Populated dynamically with queued songs -->
+        </div>
+      </div>
+
+      <div class="find-more-box">
+        <div class="find-more-title">Sources externes</div>
+        <div class="external-links">
+          <button class="chip-link" data-url="https://bitmidi.com">BitMidi</button>
+          <button class="chip-link" data-url="https://virtualpiano.net/music-sheets/">VirtualPiano.net</button>
+          <button class="chip-link" data-url="https://www.midiworld.com/">MidiWorld</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Vertical Resizer: Left Sidebar <-> Center Stage -->
+    <div class="resizer-v" id="resizer-left" title="Glisser pour agrandir/réduire le Répertoire (Double-clic : réinitialiser)"></div>
+
+    <!-- Center Stage: Active Song, Mode Controls & Sheet Reader -->
+    <section class="center-stage" id="panel-center">
+      <!-- Active Song Banner & Transport Bar -->
+      <div class="song-stage-card">
+        <div class="song-header-row">
+          <div class="song-meta">
+            <span class="badge" id="current-song-badge">Classique</span>
+            <h2 id="current-song-title">Interstellar — Cornfield Chase</h2>
+            <p id="current-song-artist">Hans Zimmer • <span id="current-song-steps">0 notes</span></p>
+          </div>
+
+          <div class="live-stats">
+            <div class="stat-box">
+              <span class="stat-label">CADENCE</span>
+              <span class="stat-value" id="stat-typing-speed">0.0 <small>n/s</small></span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">POSITION</span>
+              <span class="stat-value" id="stat-progress">0 / 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Progress Scrubber -->
+        <div class="progress-wrapper">
+          <input type="range" id="song-progress-slider" min="0" max="100" value="0" />
+          <div class="progress-fill" id="song-progress-fill"></div>
+        </div>
+
+        <!-- Mode-specific Control Strip -->
+        <div class="transport-bar">
+          <!-- Mash Mode Controls -->
+          <div id="controls-mash" class="mode-control-group">
+            <div class="mash-submode-toggle">
+              <button class="submode-btn active" data-submode="flow" id="submode-flow-btn">
+                Rythme naturel
+              </button>
+              <button class="submode-btn" data-submode="step" id="submode-step-btn">
+                Pas à pas
+              </button>
+            </div>
+            <span class="mash-hint">
+              Chaque touche du clavier joue la note suivante de la partition.
+            </span>
+          </div>
+
+          <!-- Auto-Play Mode Controls -->
+          <div id="controls-autoplay" class="mode-control-group hidden">
+            <button id="btn-autoplay-toggle" class="btn accent-play">
+              Lecture (F9)
+            </button>
+            <label class="inline-control">
+              <span>Vitesse <strong id="autoplay-speed-label">1.00x</strong></span>
+              <input type="range" id="autoplay-speed-slider" min="0.25" max="2.5" step="0.05" value="1" />
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoplay-loop-check" checked />
+              <span>Boucle</span>
+            </label>
+          </div>
+
+          <!-- Free Play Mode Controls -->
+          <div id="controls-free" class="mode-control-group hidden">
+            <label class="inline-control">
+              <span>Mapping</span>
+              <select id="free-layout-select">
+                <option value="azerty" selected>AZERTY Français (Clavier PC Portable)</option>
+                <option value="vp">Standard Virtual Piano (1-M)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="transport-right">
+            <button id="btn-restart-song" class="btn secondary small" title="Retour au début (F10)">
+              Début (F10)
+            </button>
+            <button id="btn-skip-song" class="btn secondary small" title="Passer au morceau suivant (4s)">
+              Suivant
+            </button>
+          </div>
+        </div>
+
+        <!-- 4-Second Song Transition Banner -->
+        <div id="queue-transition-banner" class="queue-transition-banner hidden">
+          <div class="transition-info">
+            <span class="transition-badge" id="transition-countdown-badge">4s</span>
+            <span id="transition-next-title">Prochain morceau...</span>
+          </div>
+          <div class="transition-actions">
+            <button id="btn-transition-now" class="btn primary small">Lancer maintenant</button>
+            <button id="btn-transition-skip" class="btn secondary small">Passer celui-ci</button>
+            <button id="btn-transition-cancel" class="btn secondary small">Rester</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual Note Ribbon / Partition Reader -->
+      <div class="visualizer-card">
+        <div class="visualizer-header">
+          <span>PARTITION</span>
+          <span id="typing-prompt-banner" class="typing-prompt-text">
+            Prêt
+          </span>
+        </div>
+
+        <!-- Ribbon showing past steps, current step, and upcoming steps -->
+        <div class="note-ribbon-container">
+          <div id="note-ribbon" class="note-ribbon">
+            <!-- Dynamically rendered step cards -->
+          </div>
+        </div>
+
+        <!-- Horizontal Resizer for Sheet Sequence Preview -->
+        <div class="resizer-h" id="resizer-sheet" title="Glisser pour agrandir/réduire la Séquence complète (Double-clic : réinitialiser)"></div>
+
+        <!-- Full Sheet Text Preview (with highlighted current position) -->
+        <div class="sheet-preview-bar" id="sheet-preview-bar">
+          <div class="sheet-preview-header">
+            <span>Séquence complète</span>
+            <span id="current-chord-display" class="chord-pill">—</span>
+          </div>
+          <div id="sheet-tokens-strip" class="sheet-tokens-strip"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Vertical Resizer: Center Stage <-> Right Sidebar -->
+    <div class="resizer-v" id="resizer-right" title="Glisser pour agrandir/réduire Audio & Routage (Double-clic : réinitialiser)"></div>
+
+    <!-- Right Sidebar: Audio Studio & Virtual Microphone Router -->
+    <aside class="panel sidebar-right" id="panel-right">
+      <div class="panel-header">
+        <h2>Audio & Routage</h2>
+      </div>
+
+      <!-- Sound & Instrument Section -->
+      <div class="studio-section">
+        <div class="section-title">Instrument</div>
+        <select id="select-instrument" class="studio-select">
+          <option value="real-piano" selected>Yamaha C5 Grand Piano (Studio)</option>
+          <option value="real-piano-natural">Concert Grand (Acoustique sec)</option>
+          <option value="grand-piano">Synth Piano Harmonique</option>
+          <option value="electric-rhodes">Rhodes Mark I (EP)</option>
+          <option value="music-box">Celesta / Music Box</option>
+          <option value="synthwave">Analog Polysynth</option>
+        </select>
+
+        <div class="row-controls">
+          <label class="checkbox-label">
+            <input type="checkbox" id="check-sustain" checked />
+            <span>Sustain</span>
+          </label>
+          <div class="octave-control">
+            <span>Octave</span>
+            <button id="btn-oct-down" class="mini-btn">−</button>
+            <strong id="octave-val">0</strong>
+            <button id="btn-oct-up" class="mini-btn">+</button>
+          </div>
+        </div>
+
+        <label class="field-label">
+          <span>Gain Piano</span>
+          <strong id="label-piano-vol">100%</strong>
+        </label>
+        <input type="range" id="slider-piano-vol" min="0" max="250" value="100" />
+      </div>
+
+      <!-- Output 1: Headphones / Monitor -->
+      <div class="studio-section">
+        <div class="section-title">Sortie Écoute (Casque)</div>
+        <select id="select-monitor-output" class="studio-select">
+          <option value="default">Périphérique par défaut</option>
+        </select>
+      </div>
+
+      <!-- Output 2: Virtual Microphone Routing -->
+      <div class="studio-section highlight-mic">
+        <div class="section-title-row">
+          <span class="section-title">Sortie Micro Virtuel</span>
+          <span id="virtual-mic-badge" class="mic-status-badge off">Inactif</span>
+        </div>
+        <select id="select-virtual-mic-output" class="studio-select">
+          <option value="">Aucun périphérique sélectionné</option>
+        </select>
+        <audio id="virtual-mic-player" autoplay class="audio-sink-hidden"></audio>
+
+        <div class="discord-tip-card">
+          <div class="tip-title">&#9432; CONFIGURATION DISCORD</div>
+          <p class="tip-body">
+            1. Périphérique d'entrée dans Discord : <strong>CABLE Output (VB-Audio)</strong><br/>
+            2. <strong>Désactiver Krisp / Réduction du bruit</strong> dans Discord (mettre sur <em>Aucune</em>), sinon Discord filtre les notes de piano !
+          </p>
+        </div>
+
+        <!-- Shown automatically if no Virtual Mic Bridge (VB-Cable) is installed on Windows yet -->
+        <div id="no-virtual-mic-box" class="voice-mixer-box hidden">
+          <div class="warning-text">
+            Pilote VB-Cable non détecté
+          </div>
+          <p class="helper-small">
+            Nécessaire pour envoyer l'audio vers l'entrée micro Discord.
+          </p>
+          <button id="btn-install-vbcable" class="btn primary small full-width">
+            Installer VB-Cable
+          </button>
+        </div>
+
+        <button id="btn-refresh-devices" class="btn secondary small full-width">
+          Actualiser les périphériques
+        </button>
+
+        <!-- Real Microphone Voice Mixing -->
+        <div class="voice-mixer-box">
+          <label class="checkbox-label">
+            <input type="checkbox" id="check-enable-real-mic" />
+            <span>Combiner avec le micro voix</span>
+          </label>
+          <div id="real-mic-settings" class="real-mic-settings hidden">
+            <label class="field-label">Entrée microphone</label>
+            <select id="select-real-mic-input" class="studio-select"></select>
+
+            <label class="field-label">
+              <span>Gain Voix</span>
+              <strong id="label-mic-vol">100%</strong>
+            </label>
+            <input type="range" id="slider-mic-vol" min="0" max="200" value="100" />
+
+            <label class="checkbox-label">
+              <input type="checkbox" id="check-monitor-voice" />
+              <span>Retour voix dans le casque</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Live VU Meters -->
+        <div class="vu-meters">
+          <div class="vu-row">
+            <span>OUT</span>
+            <div class="vu-bar"><div id="vu-piano-fill" class="vu-fill piano"></div></div>
+          </div>
+          <div class="vu-row">
+            <span>MIC</span>
+            <div class="vu-bar"><div id="vu-mic-fill" class="vu-fill voice"></div></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Horizontal Resizer: Workspace <-> Piano Keyboard -->
+  <div class="resizer-h" id="resizer-piano" title="Glisser pour agrandir/réduire le Clavier Piano (Double-clic : réinitialiser)"></div>
+
+  <!-- Bottom 61-Key Interactive Piano Keyboard -->
+  <footer id="piano-dock-footer" class="piano-dock">
+    <div class="piano-fallboard"></div>
+    <div id="piano-keyboard" class="piano-keyboard">
+      <!-- 61 keys rendered dynamically by app.js -->
+    </div>
+  </footer>
+
+  <!-- Modal 1: Paste / Create Custom Sheet -->
+  <div id="modal-sheet" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Éditer une partition</h3>
+        <button id="btn-close-sheet-modal" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-col">
+            <label>Titre</label>
+            <input type="text" id="custom-sheet-title" placeholder="Titre du morceau" />
+          </div>
+          <div class="form-col small">
+            <label>BPM</label>
+            <input type="number" id="custom-sheet-bpm" value="120" min="40" max="260" />
+          </div>
+        </div>
+        <label>Notation (Virtual Piano <code>[tu] o p</code> ou Notes <code>C4 D4 E4</code>)</label>
+        <textarea id="custom-sheet-text" rows="7" placeholder="Collez la partition texte ici..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-sheet" class="btn secondary">Annuler</button>
+        <button id="btn-save-sheet" class="btn primary">Charger</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Virtual Microphone Setup Guide -->
+  <div id="modal-mic-guide" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h3>Routage Audio vers Discord</h3>
+        <button id="btn-close-mic-guide" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body guide-steps">
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div>
+            <h4>Pilote VB-Cable</h4>
+            <p>
+              Installez le périphérique virtuel <b>VB-Cable</b> pour relier la sortie du piano à une entrée microphone Windows.
+            </p>
+            <button class="btn secondary small chip-link" data-url="https://vb-audio.com/Cable/">
+              Site officiel VB-Audio
+            </button>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div>
+            <h4>Configuration dans Virtual Piano</h4>
+            <ul>
+              <li><b>Sortie Écoute</b> : conservez votre casque habituel.</li>
+              <li><b>Sortie Micro Virtuel</b> : sélectionnez <code>CABLE Input</code>.</li>
+              <li>Activez <b>Combiner avec le micro voix</b> pour parler tout en jouant.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div>
+            <h4>Configuration dans Discord</h4>
+            <ul>
+              <li>Dans <i>Voix et Vidéo</i>, sélectionnez <code>CABLE Output</code> comme périphérique d'entrée.</li>
+              <li>Désactivez la réduction de bruit <i>Krisp</i> pour éviter que les notes aiguës ne soient filtrées.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-ok-mic-guide" class="btn primary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="songs.js"></script>
+  <script src="audioEngine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
