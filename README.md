@@ -2,6 +2,8 @@
 
 Application desktop Electron permettant de jouer du piano au clavier PC, lire des fichiers MIDI (`.mid`) et envoyer le son directement dans un micro virtuel (Discord, OBS, etc.).
 
+Démo jouable directement dans le navigateur (avec les samples du projet) : **[nitrovinzleo.github.io/keyflow-virtual-piano](https://nitrovinzleo.github.io/keyflow-virtual-piano/)**
+
 ## Fonctionnalités
 
 - **Mode Frappe Magique** : chaque touche pressée sur le clavier joue la note suivante de la partition chargée, avec suivi en temps réel sur la bande de notes.

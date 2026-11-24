@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KeyFlow Studio — Virtual Piano (Démo Web)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --paper: #FAF7F6;
+      --surface: #FFFDFD;
+      --stage: #140810;
+      --stage-elevated: #23111C;
+      --ink: #120B10;
+      --muted: #52434C;
+      --crimson: #9D174D;
+      --rose: #D81B60;
+      --rose-soft: #FCE7EE;
+      --gold: #FDE047;
+      --gold-ink: #5C3409;
+      --line: rgba(18, 11, 16, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      padding: 1rem 1.5rem;
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .brand-title {
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-sub {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--crimson);
+    }
+
+    .repo-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      background: var(--stage);
+      color: #FBF7F8;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: background 0.15s ease;
+    }
+
+    .repo-link:hover { background: var(--crimson); }
+
+    main {
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.25rem 1.5rem 3rem;
+      flex: 1;
+    }
+
+    .intro {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.75rem;
+    }
+
+    h1 {
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.98rem;
+      max-width: 480px;
+      line-height: 1.55;
+      margin-top: 0.5rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    button.ctrl {
+      min-height: 40px;
+      padding: 0.5rem 0.95rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+    }
+
+    button.ctrl:hover { border-color: var(--crimson); color: var(--crimson); }
+    button.ctrl:active { transform: scale(0.98); }
+
+    button.ctrl.active {
+      background: var(--stage);
+      color: #FBF7F8;
+      border-color: var(--stage);
+    }
+
+    button.ctrl.primary {
+      background: var(--gold);
+      color: var(--gold-ink);
+      border-color: var(--gold);
+      font-weight: 700;
+    }
+
+    button.ctrl.primary:hover {
+      background: #facc15;
+      color: var(--gold-ink);
+    }
+
+    .stage-card {
+      background: var(--stage);
+      border-radius: 16px;
+      padding: 1.25rem 1.25rem 1.5rem;
+      box-shadow: 0 20px 44px -16px rgba(20, 8, 16, 0.28);
+    }
+
+    .stage-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid rgba(251, 247, 248, 0.12);
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      color: #D9C8D0;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--rose);
+    }
+
+    .now-playing {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--gold);
+      min-height: 1.2em;
+    }
+
+    .piano-wrap {
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+
+    .piano {
+      position: relative;
+      display: flex;
+      height: 230px;
+      min-width: 780px;
+      user-select: none;
+      gap: 3px;
+    }
+
+    .key-white {
+      position: relative;
+      flex: 1;
+      background: #FAF7F6;
+      border-radius: 0 0 8px 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 12px;
+      gap: 4px;
+      transition: background 0.06s ease, transform 0.06s ease;
+    }
+
+    .key-white:hover { background: #FFFDFD; }
+
+    .key-white.active {
+      background: var(--rose);
+      transform: translateY(2px);
+    }
+
+    .key-white.active .key-label,
+    .key-white.active .key-note {
+      color: #FFFDFD;
+    }
+
+    .key-black {
+      position: absolute;
+      top: 0;
+      width: 3.4%;
+      height: 142px;
+      background: #140810;
+      border: 1px solid rgba(251, 247, 248, 0.15);
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      z-index: 3;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 10px;
+      gap: 2px;
+      transition: background 0.06s ease, transform 0.06s ease;
+    }
+
+    .key-black.active {
+      background: var(--gold);
+      transform: translateY(2px);
+    }
+
+    .key-black.active .key-label,
+    .key-black.active .key-note {
+      color: var(--gold-ink);
+    }
+
+    .key-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .key-note {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.64rem;
+      color: var(--muted);
+    }
+
+    .key-black .key-label { color: #FBF7F8; font-size: 0.68rem; }
+    .key-black .key-note { color: #D9C8D0; font-size: 0.58rem; }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .kbd {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      background: var(--rose-soft);
+      color: var(--crimson);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-title">KEYFLOW STUDIO</span>
+        <span class="brand-sub">/ VIRTUAL PIANO · DÉMO WEB</span>
+      </div>
+      <a class="repo-link" href="https://github.com/Nitrovinzleo/keyflow-virtual-piano" target="_blank" rel="noopener">
+        Code source sur GitHub
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="intro">
+      <div>
+        <h1>Virtual Piano</h1>
+        <p class="subtitle">
+          Démo navigateur avec les samples audio réels du projet Electron. Joue directement à la souris, au tactile ou au clavier PC.
+        </p>
+      </div>
+      <div class="controls">
+        <button id="btn-sustain" class="ctrl active" type="button" aria-pressed="true">Sustain : ON</button>
+        <button id="btn-demo-interstellar" class="ctrl primary" type="button">Auto-Play : Interstellar</button>
+        <button id="btn-stop" class="ctrl" type="button">Stop</button>
+      </div>
+    </div>
+
+    <section class="stage-card" aria-label="Clavier virtuel">
+      <div class="stage-bar">
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <span id="audio-status">Chargement des samples piano...</span>
+        </div>
+        <div id="now-playing" class="now-playing">Prêt</div>
+      </div>
+
+      <div class="piano-wrap">
+        <div id="piano" class="piano"></div>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      <div>
+        Raccourcis clavier : rangée <span class="kbd">Q S D F G H J K L M</span> (notes blanches) et <span class="kbd">Z E T Y U O P</span> (dièses).
+      </div>
+      <div>
+        Version complète Electron (MIDI, Frappe Magique, Micro Virtuel &amp; Discord RPC) sur GitHub.
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const SAMPLE_MAP = [
+      { midi: 36, file: "C2.mp3" }, { midi: 42, file: "Fs2.mp3" }, { midi: 45, file: "A2.mp3" },
+      { midi: 48, file: "C3.mp3" }, { midi: 51, file: "Ds3.mp3" }, { midi: 54, file: "Fs3.mp3" }, { midi: 57, file: "A3.mp3" },
+      { midi: 60, file: "C4.mp3" }, { midi: 63, file: "Ds4.mp3" }, { midi: 66, file: "Fs4.mp3" }, { midi: 69, file: "A4.mp3" },
+      { midi: 72, file: "C5.mp3" }, { midi: 75, file: "Ds5.mp3" }, { midi: 78, file: "Fs5.mp3" }, { midi: 81, file: "A5.mp3" },
+      { midi: 84, file: "C6.mp3" }, { midi: 87, file: "Ds6.mp3" }, { midi: 90, file: "Fs6.mp3" }, { midi: 93, file: "A6.mp3" },
+      { midi: 96, file: "C7.mp3" }
+    ];
+
+    const KEYS = [
+      { midi: 60, note: "C4",  black: false, key: "q" },
+      { midi: 61, note: "C#4", black: true,  key: "z" },
+      { midi: 62, note: "D4",  black: false, key: "s" },
+      { midi: 63, note: "D#4", black: true,  key: "e" },
+      { midi: 64, note: "E4",  black: false, key: "d" },
+      { midi: 65, note: "F4",  black: false, key: "f" },
+      { midi: 66, note: "F#4", black: true,  key: "t" },
+      { midi: 67, note: "G4",  black: false, key: "g" },
+      { midi: 68, note: "G#4", black: true,  key: "y" },
+      { midi: 69, note: "A4",  black: false, key: "h" },
+      { midi: 70, note: "A#4", black: true,  key: "u" },
+      { midi: 71, note: "B4",  black: false, key: "j" },
+      { midi: 72, note: "C5",  black: false, key: "k" },
+      { midi: 73, note: "C#5", black: true,  key: "o" },
+      { midi: 74, note: "D5",  black: false, key: "l" },
+      { midi: 75, note: "D#5", black: true,  key: "p" },
+      { midi: 76, note: "E5",  black: false, key: "m" },
+      { midi: 77, note: "F5",  black: false, key: "w" },
+      { midi: 78, note: "F#5", black: true,  key: "x" },
+      { midi: 79, note: "G5",  black: false, key: "c" },
+      { midi: 80, note: "G#5", black: true,  key: "v" },
+      { midi: 81, note: "A5",  black: false, key: "b" },
+      { midi: 82, note: "A#5", black: true,  key: "n" },
+      { midi: 83, note: "B5",  black: false, key: "," },
+      { midi: 84, note: "C6",  black: false, key: ";" }
+    ];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buffers = new Map();
+    let sustain = true;
+    let demoTimers = [];
+
+    const statusEl = document.getElementById("audio-status");
+    const nowPlayingEl = document.getElementById("now-playing");
+    const pianoEl = document.getElementById("piano");
+    const keyElements = new Map();
+
+    // Render keyboard
+    const whiteKeys = KEYS.filter(k => !k.black);
+    const whiteWidthPct = 100 / whiteKeys.length;
+    let whiteIndex = 0;
+
+    KEYS.forEach((k) => {
+      const btn = document.createElement("div");
+      btn.dataset.midi = k.midi;
+      if (!k.black) {
+        btn.className = "key-white";
+        btn.innerHTML = `<span class="key-label">${k.key.toUpperCase()}</span><span class="key-note">${k.note}</span>`;
+        pianoEl.appendChild(btn);
+        whiteIndex++;
+      } else {
+        btn.className = "key-black";
+        btn.style.left = `calc(${whiteIndex * whiteWidthPct}% - 1.7%)`;
+        btn.innerHTML = `<span class="key-label">${k.key.toUpperCase()}</span><span class="key-note">${k.note}</span>`;
+        pianoEl.appendChild(btn);
+      }
+
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        playMidi(k.midi, k.note);
+      });
+      keyElements.set(k.midi, btn);
+    });
+
+    // Load real piano samples
+    async function loadSamples() {
+      let loaded = 0;
+      await Promise.all(SAMPLE_MAP.map(async (s) => {
+        try {
+          const res = await fetch(`./samples/${s.file}`);
+          const arr = await res.arrayBuffer();
+          const buf = await audioCtx.decodeAudioData(arr);
+          buffers.set(s.midi, buf);
+          loaded++;
+        } catch (_) {}
+      }));
+      statusEl.textContent = `${loaded}/${SAMPLE_MAP.length} samples chargés · Web Audio API`;
+    }
+
+    function nearestSample(midi) {
+      let best = null;
+      let minDist = Infinity;
+      for (const [m, buf] of buffers.entries()) {
+        const d = Math.abs(m - midi);
+        if (d < minDist) {
+          minDist = d;
+          best = { midi: m, buffer: buf };
+        }
+      }
+      return best;
+    }
+
+    function playMidi(midi, label = "") {
+      if (audioCtx.state === "suspended") audioCtx.resume();
+
+      const el = keyElements.get(midi);
+      if (el) {
+        el.classList.add("active");
+        setTimeout(() => el.classList.remove("active"), 180);
+      }
+      if (label) nowPlayingEl.textContent = `Note : ${label}`;
+
+      const sample = nearestSample(midi);
+      if (!sample) return;
+
+      const src = audioCtx.createBufferSource();
+      src.buffer = sample.buffer;
+      src.playbackRate.value = Math.pow(2, (midi - sample.midi) / 12);
+
+      const gain = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+      gain.gain.setValueAtTime(0.85, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (sustain ? 2.4 : 0.65));
+
+      src.connect(gain);
+      gain.connect(audioCtx.destination);
+      src.start(now);
+      src.stop(now + (sustain ? 2.5 : 0.7));
+    }
+
+    // Keyboard input
+    const pressed = new Set();
+    window.addEventListener("keydown", (e) => {
+      if (e.repeat) return;
+      const k = e.key.toLowerCase();
+      if (pressed.has(k)) return;
+      const found = KEYS.find(item => item.key === k);
+      if (found) {
+        pressed.add(k);
+        playMidi(found.midi, found.note);
+      }
+    });
+    window.addEventListener("keyup", (e) => pressed.delete(e.key.toLowerCase()));
+
+    // Sustain toggle
+    const sustainBtn = document.getElementById("btn-sustain");
+    sustainBtn.addEventListener("click", () => {
+      sustain = !sustain;
+      sustainBtn.classList.toggle("active", sustain);
+      sustainBtn.setAttribute("aria-pressed", String(sustain));
+      sustainBtn.textContent = `Sustain : ${sustain ? "ON" : "OFF"}`;
+    });
+
+    // Interstellar-inspired arpeggio demo
+    const DEMO_SEQ = [
+      [69, 0], [76, 300], [69, 600], [76, 900],
+      [71, 1200], [76, 1500], [71, 1800], [76, 2100],
+      [72, 2400], [76, 2700], [72, 3000], [76, 3300],
+      [74, 3600], [76, 3900], [74, 4200], [76, 4500],
+      [69, 4800], [76, 5100], [81, 5400], [76, 5700],
+      [71, 6000], [76, 6300], [83, 6600], [76, 6900],
+      [72, 7200], [76, 7500], [84, 7800], [76, 8100],
+      [74, 8400], [76, 8700], [81, 9000]
+    ];
+
+    function stopDemo() {
+      demoTimers.forEach(clearTimeout);
+      demoTimers = [];
+      nowPlayingEl.textContent = "Arrêté";
+    }
+
+    document.getElementById("btn-demo-interstellar").addEventListener("click", () => {
+      stopDemo();
+      nowPlayingEl.textContent = "Auto-Play : Arpège Interstellar";
+      DEMO_SEQ.forEach(([midi, delay]) => {
+        const keyObj = KEYS.find(k => k.midi === midi);
+        demoTimers.push(setTimeout(() => playMidi(midi, keyObj ? keyObj.note : ""), delay));
+      });
+    });
+
+    document.getElementById("btn-stop").addEventListener("click", stopDemo);
+
+    loadSamples();
+  </script>
+</body>
+</html>
